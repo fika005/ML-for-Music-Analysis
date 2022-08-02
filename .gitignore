@@ -1,0 +1,8 @@
+*.pkl
+results/
+data_ogg/
+data/
+salami-data-public/
+__pycache__
+.ipynb_checkpoints
+.DS_Store
