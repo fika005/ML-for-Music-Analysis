@@ -8,10 +8,9 @@
 
 import torch
 import torch.nn as nn
-from torch.cuda.amp import autocast
 import os
 import wget
-os.environ['TORCH_HOME'] = '../../pretrained_models'
+os.environ['TORCH_HOME'] = './pretrained_models'
 import timm
 from timm.models.layers import to_2tuple,trunc_normal_
 
@@ -122,18 +121,19 @@ class ASTModel(nn.Module):
                 raise ValueError('currently model pretrained on only audioset is not supported, please set imagenet_pretrain = True to use audioset pretrained model.')
             if model_size != 'base384':
                 raise ValueError('currently only has base384 AudioSet pretrained model.')
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            if os.path.exists('../../pretrained_models/audioset_10_10_0.4593.pth') == False:
+#             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#             device = torch.device("mps")
+            if os.path.exists('pretrained_models/audioset_10_10_0.4593.pth') == False:
                 # this model performs 0.4593 mAP on the audioset eval set
                 audioset_mdl_url = 'https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1'
-                wget.download(audioset_mdl_url, out='../../pretrained_models/audioset_10_10_0.4593.pth')
-            sd = torch.load('../../pretrained_models/audioset_10_10_0.4593.pth', map_location=device)
+                wget.download(audioset_mdl_url, out='pretrained_models/audioset_10_10_0.4593.pth')
+            sd = torch.load('pretrained_models/audioset_10_10_0.4593.pth', map_location="cpu")
             audio_model = ASTModel(label_dim=527, fstride=10, tstride=10, input_fdim=128, input_tdim=1024, imagenet_pretrain=False, audioset_pretrain=False, model_size='base384', verbose=False)
             audio_model = torch.nn.DataParallel(audio_model)
             audio_model.load_state_dict(sd, strict=False)
             self.v = audio_model.module.v
             self.original_embedding_dim = self.v.pos_embed.shape[2]
-            self.mlp_head = nn.Sequential(nn.LayerNorm(self.original_embedding_dim), nn.Linear(self.original_embedding_dim, label_dim))
+            self.mlp_head = nn.Linear(self.original_embedding_dim, label_dim)
 
             f_dim, t_dim = self.get_shape(fstride, tstride, input_fdim, input_tdim)
             self.f_dim = f_dim
@@ -167,7 +167,6 @@ class ASTModel(nn.Module):
         t_dim = test_out.shape[3]
         return f_dim, t_dim
 
-    @autocast()
     def forward(self, x):
         """
         :param x: the input spectrogram, expected shape: (batch_size, time_frame_num, frequency_bins), e.g., (12, 1024, 128)
@@ -188,11 +187,13 @@ class ASTModel(nn.Module):
             x = blk(x)
         x = x[:, 2:]
         x = x.reshape(x.shape[0],  self.t_dim, self.f_dim, x.shape[-1])
+#         import pdb
+#         pdb.set_trace()
         x = self.mlp_head(x).squeeze()
         return x
 
     def loss(self, logits, labels):
-        labels = torch.repeat_interleave(labels, self.f_dim, dim=1).reshape(logits.shape[0], -1)
+        labels = labels.reshape(logits.shape[0], -1)
         return torch.binary_cross_entropy_with_logits(logits.reshape(logits.shape[0], -1), labels)
 
 if __name__ == '__main__':

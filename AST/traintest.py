@@ -15,10 +15,12 @@ import torch
 from torch import nn
 import numpy as np
 import pickle
-from torch.cuda.amp import autocast,GradScaler
+# from torch.cuda.amp import autocast,GradScaler
 
 def train(audio_model, train_loader, test_loader, args):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # uncomment if on GPU
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
 
@@ -83,7 +85,7 @@ def train(audio_model, train_loader, test_loader, args):
 
     epoch += 1
     # for amp
-    scaler = GradScaler()
+#     scaler = GradScaler()
 
     print("current #steps=%s, #epochs=%s" % (global_step, epoch))
     print("start training...")
@@ -114,9 +116,9 @@ def train(audio_model, train_loader, test_loader, args):
                     param_group['lr'] = warm_lr
                 print('warm-up learning rate is {:f}'.format(optimizer.param_groups[0]['lr']))
 
-            with autocast():
-                audio_output = audio_model(audio_input)
-                loss = loss_fn(audio_output, labels).sum()
+            
+            audio_output = audio_model(audio_input)
+            loss = loss_fn(audio_output, labels).sum()
 
             # optimization if amp is not used
             # optimizer.zero_grad()
@@ -125,9 +127,11 @@ def train(audio_model, train_loader, test_loader, args):
 
             # optimiztion if amp is used
             optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+#             scaler.scale(loss).backward()
+#             scaler.step(optimizer)
+#             scaler.update()
+            loss.backward()
+            optimizer.step()
 
             # record loss
             loss_meter.update(loss.item(), B)
