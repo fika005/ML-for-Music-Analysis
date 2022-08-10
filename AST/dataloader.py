@@ -97,7 +97,7 @@ class AudiosetDataset(Dataset):
         
         fbank, label = self.data[self.data_indices[index]]
 
-        label = torch.FloatTensor(label)
+        label = torch.FloatTensor(np.repeat(label[:, None], 12, 1))
 
         # SpecAug, not do for eval set
         freqm = torchaudio.transforms.FrequencyMasking(self.freqm)
