@@ -193,8 +193,10 @@ class ASTModel(nn.Module):
         return x
 
     def loss(self, logits, labels):
-        labels = labels.reshape(logits.shape[0], -1)
-        return torch.binary_cross_entropy_with_logits(logits.reshape(logits.shape[0], -1), labels)
+#         import pdb
+#         pdb.set_trace()
+#         labels = labels.reshape(logits.shape[0], -1)
+        return torch.nn.functional.binary_cross_entropy_with_logits(logits, labels)
 
 if __name__ == '__main__':
 
